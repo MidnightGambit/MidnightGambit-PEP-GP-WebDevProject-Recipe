@@ -4,86 +4,157 @@
 
 const BASE_URL = "http://localhost:8081"; // backend URL
 
-/* 
- * TODO: Get references to various DOM elements
- * - addIngredientNameInput
- * - deleteIngredientNameInput
- * - ingredientListContainer
- * - searchInput (optional for future use)
- * - adminLink (if visible conditionally)
- */
+let ingredients = [];
 
-/* 
- * TODO: Attach 'onclick' events to:
- * - "add-ingredient-submit-button" → addIngredient()
- * - "delete-ingredient-submit-button" → deleteIngredient()
- */
+// Get references to DOM elements
+const addIngredientNameInput = document.getElementById("add-ingredient-name-input");
+const deleteIngredientNameInput = document.getElementById("delete-ingredient-name-input");
+const ingredientListContainer = document.getElementById("ingredient-list");
+const addButton = document.getElementById("add-ingredient-submit-button");
+const deleteButton = document.getElementById("delete-ingredient-submit-button");
 
-/*
- * TODO: Create an array to keep track of ingredients
- */
+// Attach event listeners
+addButton.addEventListener("click", addIngredient);
+deleteButton.addEventListener("click", deleteIngredient);
 
-/* 
- * TODO: On page load, call getIngredients()
- */
-
+// Load ingredients when the page loads
+window.addEventListener("DOMContentLoaded", () => {
+    getIngredients();
+});
 
 /**
- * TODO: Add Ingredient Function
- * 
- * Requirements:
- * - Read and trim value from addIngredientNameInput
- * - Validate input is not empty
- * - Send POST request to /ingredients
- * - Include Authorization token from sessionStorage
- * - On success: clear input, call getIngredients() and refreshIngredientList()
- * - On failure: alert the user
+ * Add a new ingredient
  */
 async function addIngredient() {
-    // Implement add ingredient logic here
+    const name = addIngredientNameInput.value.trim();
+
+    if (!name) {
+        alert("Please enter an ingredient name.");
+        return;
+    }
+
+    const token = sessionStorage.getItem("auth-token");
+
+    if (!token) {
+        alert("You must be logged in to add ingredients.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BASE_URL}/ingredients`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ name: name })
+        });
+
+        if (response.ok) {
+            alert("Ingredient added successfully!");
+            addIngredientNameInput.value = "";   // clear input
+            await getIngredients();              // refresh list
+        } else {
+            const errorText = await response.text();
+            alert(`Failed to add ingredient: ${errorText || response.status}`);
+        }
+    } catch (error) {
+        console.error("Add ingredient error:", error);
+        alert("An error occurred while adding the ingredient.");
+    }
 }
 
-
 /**
- * TODO: Get Ingredients Function
- * 
- * Requirements:
- * - Fetch all ingredients from backend
- * - Store result in `ingredients` array
- * - Call refreshIngredientList() to display them
- * - On error: alert the user
+ * Fetch all ingredients from the backend
  */
 async function getIngredients() {
-    // Implement get ingredients logic here
+    try {
+        const response = await fetch(`${BASE_URL}/ingredients`);
+
+        if (response.ok) {
+            ingredients = await response.json();
+            refreshIngredientList();
+        } else {
+            alert("Failed to load ingredients.");
+        }
+    } catch (error) {
+        console.error("Get ingredients error:", error);
+        alert("Could not load ingredients. Please check if the server is running.");
+    }
 }
 
-
 /**
- * TODO: Delete Ingredient Function
- * 
- * Requirements:
- * - Read and trim value from deleteIngredientNameInput
- * - Search ingredientListContainer's <li> elements for matching name
- * - Determine ID based on index (or other backend logic)
- * - Send DELETE request to /ingredients/{id}
- * - On success: call getIngredients() and refreshIngredientList(), clear input
- * - On failure or not found: alert the user
+ * Delete an ingredient
  */
 async function deleteIngredient() {
-    // Implement delete ingredient logic here
+    const name = deleteIngredientNameInput.value.trim();
+
+    if (!name) {
+        alert("Please enter the ingredient name to delete.");
+        return;
+    }
+
+    // Find the ingredient in our current list
+    const ingredientToDelete = ingredients.find(ing => 
+        ing.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (!ingredientToDelete) {
+        alert("Ingredient not found. Please check the name.");
+        return;
+    }
+
+    const token = sessionStorage.getItem("auth-token");
+
+    if (!token) {
+        alert("You must be logged in to delete ingredients.");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BASE_URL}/ingredients/${ingredientToDelete.id}`, {
+            method: "DELETE",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            alert("Ingredient deleted successfully!");
+            deleteIngredientNameInput.value = "";
+            await getIngredients();   // refresh list
+        } else {
+            alert("Failed to delete ingredient.");
+        }
+    } catch (error) {
+        console.error("Delete ingredient error:", error);
+        alert("An error occurred while deleting the ingredient.");
+    }
 }
 
-
 /**
- * TODO: Refresh Ingredient List Function
- * 
- * Requirements:
- * - Clear ingredientListContainer
- * - Loop through `ingredients` array
- * - For each ingredient:
- *   - Create <li> and inner <p> with ingredient name
- *   - Append to container
+ * Refresh the ingredient list in the DOM
  */
 function refreshIngredientList() {
-    // Implement ingredient list rendering logic here
+    ingredientListContainer.innerHTML = ""; // clear current list
+
+    if (ingredients.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "No ingredients found.";
+        li.style.fontStyle = "italic";
+        ingredientListContainer.appendChild(li);
+        return;
+    }
+
+    ingredients.forEach(ingredient => {
+        const li = document.createElement("li");
+        const p = document.createElement("p");
+        p.textContent = ingredient.name;
+        li.appendChild(p);
+        ingredientListContainer.appendChild(li);
+    });
 }
